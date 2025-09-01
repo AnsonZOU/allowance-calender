@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>おこづかいゲット大作戦！</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #F7F9FC;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .flow-arrow {
+            font-size: 2rem;
+            color: #118AB2;
+            line-height: 1;
+        }
+        .number-highlight {
+            font-weight: 800;
+            color: #FF6B6B;
+        }
+    </style>
+</head>
+<body class="text-[#073B4C]">
+
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-[#073B4C] mb-2">おこづかいゲット大作戦！</h1>
+            <p class="text-lg text-[#118AB2]">毎日のクエストをクリアして、おこづかいをレベルアップさせよう！</p>
+        </header>
+
+        <main class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+            <section class="md:col-span-2 bg-white rounded-xl shadow-lg p-6 flex flex-col md:flex-row items-center justify-around">
+                <div class="text-center md:text-left">
+                    <h2 class="text-2xl font-bold mb-2">ステップ①：ベースキャンプ</h2>
+                    <p class="mb-4">これは毎月必ずもらえる基本装備！ここから冒険が始まるぞ。</p>
+                </div>
+                <div class="text-center bg-[#118AB2] text-white rounded-lg p-6 shadow-md">
+                    <p class="text-xl font-bold">固定のおこづかい</p>
+                    <p class="text-5xl font-extrabold">1,000<span class="text-2xl">円</span></p>
+                </div>
+            </section>
+
+            <section class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-center mb-4">ステップ②：デイリークエスト</h2>
+                <p class="text-center mb-6">毎日コツコツ挑戦できる2つのクエスト。クリアすればするほど、おこづかいが増えていく！</p>
+                <div class="space-y-6">
+                    <div class="border-2 border-[#FFD166] rounded-lg p-4">
+                        <h3 class="font-bold text-lg">📝 毎日サインアップアワード</h3>
+                        <p>毎日90分の勉強を完了し、証拠の写真をアップロード！</p>
+                        <p class="text-right text-2xl font-bold text-[#FFD166]">+100円/日</p>
+                    </div>
+                    <div class="border-2 border-[#06D6A0] rounded-lg p-4">
+                        <h3 class="font-bold text-lg">📖 デイリータスクアワード</h3>
+                        <p>英単語テスト合格、または感想文200字を提出！</p>
+                        <p class="text-right text-2xl font-bold text-[#06D6A0]">+200円/日</p>
+                    </div>
+                </div>
+                 <p class="text-sm text-center mt-6 text-gray-600">31日間、毎日両方のクエストをクリアすると、合計で<span class="font-bold text-xl text-[#FF6B6B]">9,300円</span>もゲットできる！</p>
+            </section>
+
+            <section class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-center mb-4">最大ポテンシャル分析</h2>
+                <p class="text-center mb-6">もし1ヶ月（31日）毎日クエストをクリアしたら、どれくらい稼げるかな？</p>
+                <div class="chart-container">
+                    <canvas id="dailyPotentialChart"></canvas>
+                </div>
+                 <p class="text-sm text-center mt-4 text-gray-600">デイリータスクはサインアップの2倍の価値がある！得意な方から挑戦しよう！</p>
+            </section>
+            
+            <section class="md:col-span-2 bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-center mb-4">ステップ③：ボーナスチャレンジ</h2>
+                <p class="text-center mb-6">体力も大事なスキル！運動クエストをクリアして、月末に大きなボーナスを手に入れよう！</p>
+                <div class="chart-container h-64 md:h-80">
+                     <canvas id="bonusChart"></canvas>
+                </div>
+                 <p class="text-sm text-center mt-4 text-gray-600">運動を頑張れば頑張るほど、ボーナスがパワーアップするぞ！</p>
+            </section>
+
+            <section class="md:col-span-2 bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-center mb-4">報酬の支払いタイミング</h2>
+                <p class="text-center mb-6">おこづかいは月に3回に分けて支給される。計画的に使おう！</p>
+                <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
+                    <div class="text-center p-4 border rounded-lg flex-1">
+                        <h3 class="font-bold text-lg">毎月1日</h3>
+                        <p>固定(1,000円) + 前月後半(16~月末)のデイリー報酬</p>
+                    </div>
+                    <div class="flow-arrow hidden md:block">&rarr;</div>
+                     <div class="flow-arrow md:hidden">&darr;</div>
+                    <div class="text-center p-4 border rounded-lg flex-1">
+                        <h3 class="font-bold text-lg">毎月16日</h3>
+                        <p>当月前半(1~15日)のデイリー報酬</p>
+                    </div>
+                     <div class="flow-arrow hidden md:block">&rarr;</div>
+                     <div class="flow-arrow md:hidden">&darr;</div>
+                    <div class="text-center p-4 border rounded-lg flex-1">
+                        <h3 class="font-bold text-lg">月末</h3>
+                        <p>当月のボーナスチャレンジ報酬</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="md:col-span-2 bg-[#073B4C] text-white rounded-xl shadow-lg p-8 text-center">
+                 <h2 class="text-3xl font-bold mb-4">君の最大月収ポテンシャル！</h2>
+                 <p class="mb-6">全てのクエストとボーナスを最大レベルでクリアした場合...</p>
+                 <p class="text-6xl font-extrabold text-[#FFD166] mb-4">14,300<span class="text-3xl">円</span></p>
+                 <div class="chart-container h-80">
+                     <canvas id="totalPotentialChart"></canvas>
+                 </div>
+                 <p class="mt-6">毎日の努力が、大きな成果につながる！さあ、大作戦を開始しよう！</p>
+            </section>
+        </main>
+    </div>
+
+<script>
+    const FONT_COLOR = '#073B4C';
+    const BORDER_COLOR = '#D1D5DB';
+    const PALETTE = {
+        red: '#FF6B6B',
+        yellow: '#FFD166',
+        green: '#06D6A0',
+        blue: '#118AB2',
+        dark: '#073B4C'
+    };
+
+    const CHART_DEFAULTS = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+                labels: {
+                    color: FONT_COLOR,
+                    font: {
+                        size: 14,
+                        family: "'M PLUS Rounded 1c', sans-serif"
+                    }
+                }
+            },
+            tooltip: {
+                callbacks: {
+                    title: function(tooltipItems) {
+                        const item = tooltipItems[0];
+                        let label = item.chart.data.labels[item.dataIndex];
+                        if (Array.isArray(label)) {
+                            return label.join(' ');
+                        } else {
+                            return label;
+                        }
+                    }
+                },
+                bodyFont: {
+                    family: "'M PLUS Rounded 1c', sans-serif"
+                },
+                titleFont: {
+                     family: "'M PLUS Rounded 1c', sans-serif"
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: BORDER_COLOR,
+                },
+                ticks: {
+                     color: FONT_COLOR,
+                }
+            },
+            x: {
+                 grid: {
+                    display: false,
+                },
+                 ticks: {
+                     color: FONT_COLOR,
+                }
+            }
+        }
+    };
+
+    const wrapLabel = (label) => {
+        const maxLength = 16;
+        if (label.length <= maxLength) return label;
+        
+        const words = label.split(' ');
+        let lines = [];
+        let currentLine = '';
+        
+        words.forEach(word => {
+            if ((currentLine + word).length > maxLength) {
+                lines.push(currentLine.trim());
+                currentLine = '';
+            }
+            currentLine += word + ' ';
+        });
+        lines.push(currentLine.trim());
+        return lines;
+    };
+
+
+    const dailyPotentialCtx = document.getElementById('dailyPotentialChart');
+    if (dailyPotentialCtx) {
+        new Chart(dailyPotentialCtx, {
+            type: 'bar',
+            data: {
+                labels: ['毎日サインアップ', 'デイリータスク'],
+                datasets: [{
+                    label: '31日間での最大獲得金額 (円)',
+                    data: [3100, 6200],
+                    backgroundColor: [PALETTE.yellow, PALETTE.green],
+                    borderColor: [PALETTE.yellow, PALETTE.green],
+                    borderWidth: 1
+                }]
+            },
+            options: CHART_DEFAULTS
+        });
+    }
+
+    const bonusCtx = document.getElementById('bonusChart');
+    if(bonusCtx) {
+        new Chart(bonusCtx, {
+            type: 'bar',
+            data: {
+                labels: ['月10回以上クリア', '月20回以上クリア'],
+                datasets: [{
+                    label: '獲得ボーナス (円)',
+                    data: [2000, 4000],
+                    backgroundColor: [PALETTE.blue, PALETTE.red],
+                    borderColor: [PALETTE.blue, PALETTE.red],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...CHART_DEFAULTS,
+            }
+        });
+    }
+
+    const totalPotentialCtx = document.getElementById('totalPotentialChart');
+    if (totalPotentialCtx) {
+        new Chart(totalPotentialCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['固定費', 'サインアップ', 'デイリータスク', '最大ボーナス'],
+                datasets: [{
+                    label: '金額 (円)',
+                    data: [1000, 3100, 6200, 4000],
+                    backgroundColor: [
+                        PALETTE.blue,
+                        PALETTE.yellow,
+                        PALETTE.green,
+                        PALETTE.red
+                    ],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#FFFFFF',
+                            font: {
+                                size: 14,
+                                family: "'M PLUS Rounded 1c', sans-serif"
+                            }
+                        }
+                    },
+                     tooltip: CHART_DEFAULTS.plugins.tooltip
+                }
+            }
+        });
+    }
+
+</script>
+</body>
+</html>
