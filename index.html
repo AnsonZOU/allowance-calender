@@ -451,14 +451,18 @@
 <div id="login-screen" class="flex flex-col items-center justify-center min-h-screen bg-[#F0F4F8] text-center space-y-6">
     <h1 class="text-4xl font-extrabold text-[#073B4C]">おこづかいゲット大作戦！</h1>
     <p class="text-lg text-[#118AB2]">ログインしてはじめよう！</p>
-    <div class="space-x-4">
-        <button onclick="selectRole('child')" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded">
-            子どもとして使う
+    <form id="login-form" class="flex flex-col space-y-4 w-72">
+        <input type="text" id="user-id-input" placeholder="ユーザーID" class="border p-2 rounded text-center" required />
+        <input type="password" id="user-pass-input" placeholder="パスワード" class="border p-2 rounded text-center" required />
+        <select id="role-select" class="border p-2 rounded text-center">
+            <option value="child">子どもモード</option>
+            <option value="parent">保護者モード</option>
+        </select>
+        <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+            ログイン
         </button>
-        <button onclick="selectRole('parent')" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
-            保護者として使う
-        </button>
-    </div>
+    </form>
+    <p id="login-error" class="text-red-600 text-sm font-bold"></p>
 </div>
  class="bg-gray-100 p-8 flex flex-col items-center">
     <div id="modal" class="modal">
@@ -521,28 +525,60 @@
 
 <script>
     const loginScreen = document.getElementById('login-screen');
-    const mainApp = document.querySelector('.bg-white.rounded-xl.shadow-lg'); // main container
+    const mainApp = document.querySelector('.bg-white.rounded-xl.shadow-lg');
     const userIdDisplay = document.getElementById('user-id-display');
+    const loginForm = document.getElementById('login-form');
+    const errorMsg = document.getElementById('login-error');
 
-    function selectRole(role) {
-        localStorage.setItem('userRole', role);
-        location.reload();
-    }
+    // 固定ログイン情報（仮）
+    const USERS = {
+        'child1': { password: '1234', role: 'child' },
+        'parent1': { password: 'admin', role: 'parent' }
+    };
 
     function logout() {
         localStorage.removeItem('userRole');
+        localStorage.removeItem('userId');
         location.reload();
     }
 
+    function setLogin(id, role) {
+        localStorage.setItem('userRole', role);
+        localStorage.setItem('userId', id);
+    }
+
+    loginForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        const inputId = document.getElementById('user-id-input').value.trim();
+        const inputPass = document.getElementById('user-pass-input').value.trim();
+        const selectedRole = document.getElementById('role-select').value;
+
+        if (!USERS[inputId]) {
+            errorMsg.textContent = 'ユーザーIDが存在しません。';
+            return;
+        }
+        if (USERS[inputId].password !== inputPass) {
+            errorMsg.textContent = 'パスワードが違います。';
+            return;
+        }
+        if (USERS[inputId].role !== selectedRole) {
+            errorMsg.textContent = 'ロールが一致しません。';
+            return;
+        }
+        setLogin(inputId, selectedRole);
+        location.reload();
+    });
+
     window.addEventListener('DOMContentLoaded', () => {
         const role = localStorage.getItem('userRole');
-        if (!role) {
+        const uid = localStorage.getItem('userId');
+        if (!role || !uid) {
             loginScreen.style.display = 'flex';
-            mainApp.style.display = 'none';
+            if (mainApp) mainApp.style.display = 'none';
         } else {
             loginScreen.style.display = 'none';
-            mainApp.style.display = 'block';
-            userIdDisplay.textContent = `ログイン中：${role === 'parent' ? '保護者' : '子ども'}モード`;
+            if (mainApp) mainApp.style.display = 'block';
+            userIdDisplay.textContent = `ログイン中：${role === 'parent' ? '保護者' : '子ども'}（ID: ${uid}）`;
 
             // ログアウトボタン追加
             const logoutBtn = document.createElement('button');
@@ -551,8 +587,9 @@
             logoutBtn.onclick = logout;
             userIdDisplay.appendChild(logoutBtn);
 
-            // isParent 変数の上書き（元スクリプトに影響）
+            // isParentグローバルに設定
             window.isParent = (role === 'parent');
+            window.userId = uid;
         }
     });
 </script>
