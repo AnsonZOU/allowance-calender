@@ -446,7 +446,21 @@
         };
     </script>
 </head>
-<body class="bg-gray-100 p-8 flex flex-col items-center">
+<body>
+
+<div id="login-screen" class="flex flex-col items-center justify-center min-h-screen bg-[#F0F4F8] text-center space-y-6">
+    <h1 class="text-4xl font-extrabold text-[#073B4C]">おこづかいゲット大作戦！</h1>
+    <p class="text-lg text-[#118AB2]">ログインしてはじめよう！</p>
+    <div class="space-x-4">
+        <button onclick="selectRole('child')" class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded">
+            子どもとして使う
+        </button>
+        <button onclick="selectRole('parent')" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded">
+            保護者として使う
+        </button>
+    </div>
+</div>
+ class="bg-gray-100 p-8 flex flex-col items-center">
     <div id="modal" class="modal">
         <div class="modal-content rounded-lg shadow-lg">
             <p id="modal-message" class="text-xl font-bold"></p>
@@ -504,5 +518,44 @@
             </div>
         </div>
     </div>
+
+<script>
+    const loginScreen = document.getElementById('login-screen');
+    const mainApp = document.querySelector('.bg-white.rounded-xl.shadow-lg'); // main container
+    const userIdDisplay = document.getElementById('user-id-display');
+
+    function selectRole(role) {
+        localStorage.setItem('userRole', role);
+        location.reload();
+    }
+
+    function logout() {
+        localStorage.removeItem('userRole');
+        location.reload();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const role = localStorage.getItem('userRole');
+        if (!role) {
+            loginScreen.style.display = 'flex';
+            mainApp.style.display = 'none';
+        } else {
+            loginScreen.style.display = 'none';
+            mainApp.style.display = 'block';
+            userIdDisplay.textContent = `ログイン中：${role === 'parent' ? '保護者' : '子ども'}モード`;
+
+            // ログアウトボタン追加
+            const logoutBtn = document.createElement('button');
+            logoutBtn.textContent = 'ログアウト';
+            logoutBtn.className = 'text-sm text-blue-600 underline ml-2';
+            logoutBtn.onclick = logout;
+            userIdDisplay.appendChild(logoutBtn);
+
+            // isParent 変数の上書き（元スクリプトに影響）
+            window.isParent = (role === 'parent');
+        }
+    });
+</script>
+
 </body>
 </html>
