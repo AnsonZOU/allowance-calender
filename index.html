@@ -135,7 +135,7 @@ const firebaseConfig = {
 
         const PARENT_USER_ID = "parent_user_id_placeholder";
 
-        let db, auth, userId, isParent;
+        let db, auth, window.userId, isParent;
         let unsubscribe;
         let currentMonth = new Date();
         const calendarGrid = document.getElementById('calendar-grid');
@@ -366,7 +366,7 @@ const firebaseConfig = {
         };
 
         const handleTaskCompletion = async (day, task) => {
-             if (!userId) {
+             if (!window.userId) {
                 console.error("User not authenticated.");
                 SHOW_MESSAGE("ユーザー認証が完了していません。");
                 return;
@@ -378,7 +378,7 @@ const firebaseConfig = {
             }
             setTimeout(async () => {
                  try {
-                    const docRef = doc(db, `artifacts/${appId}/users/${userId}/allowanceProgress`, `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}`);
+                    const docRef = doc(db, `artifacts/${appId}/users/${window.userId}/allowanceProgress`, `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}`);
                     await setDoc(docRef, { [day]: { [task]: true } }, { merge: true });
                     SHOW_MESSAGE("スタンプが押されました！");
                 } catch (e) {
@@ -390,11 +390,11 @@ const firebaseConfig = {
 
         const listenForUpdates = () => {
             if (unsubscribe) unsubscribe();
-            if (!userId) {
+            if (!window.userId) {
                 console.error("User not authenticated for listening.");
                 return;
             }
-            const docRef = doc(db, `artifacts/${appId}/users/${userId}/allowanceProgress`, `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}`);
+            const docRef = doc(db, `artifacts/${appId}/users/${window.userId}/allowanceProgress`, `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}`);
             unsubscribe = onSnapshot(docRef, (doc) => {
                 if (doc.exists()) {
                     updateUI(doc.data());
@@ -427,9 +427,9 @@ const firebaseConfig = {
                 await new Promise(resolve => {
                     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
                         if (user) {
-                            userId = user.uid;
-                            isParent = (userId === PARENT_USER_ID);
-                            userIdDisplay.textContent = `ユーザーID: ${userId} (${isParent ? '親' : '子供'})`;
+                            window.userId = user.uid;
+                            isParent = (window.userId === PARENT_USER_ID);
+                            if(userIdDisplay) userIdDisplay.textContent = `ユーザーID: ${userId} (${isParent ? '親' : '子供'})`;
                             listenForUpdates();
                             unsubscribeAuth();
                             resolve();
@@ -548,7 +548,7 @@ const firebaseConfig = {
   function logout() {
     localStorage.removeItem('userId');
     localStorage.removeItem('userRole');
-    location.reload();
+    setTimeout(() => { if (typeof renderCalendar === 'function') renderCalendar(); }, 500);
   }
 
   loginForm.addEventListener('submit', (e) => {
@@ -561,10 +561,11 @@ const firebaseConfig = {
     if (USERS[id].role !== role) return errorMsg.textContent = "ロールが一致しません";
     localStorage.setItem('userId', id);
     localStorage.setItem('userRole', role);
-    location.reload();
+    setTimeout(() => { if (typeof renderCalendar === 'function') renderCalendar(); }, 500);
   });
 
   window.addEventListener('DOMContentLoaded', () => {
+  if (typeof renderCalendar === 'function') renderCalendar();
     const uid = localStorage.getItem('userId');
     const role = localStorage.getItem('userRole');
     if (uid && role) {
@@ -575,7 +576,7 @@ const firebaseConfig = {
           <button onclick="logout()" class="ml-2 text-sm text-blue-600 underline">ログアウト</button>`;
       }
       window.isParent = (role === 'parent');
-      window.userId = uid;
+      window.window.userId = uid;
     } else {
       loginScreen.style.display = 'flex';
       if (mainApp) mainApp.style.display = 'none';
