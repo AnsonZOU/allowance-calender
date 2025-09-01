@@ -461,30 +461,17 @@ const firebaseConfig = {
 <div id="login-screen" class="hidden flex-col items-center justify-center min-h-screen text-center space-y-6">
   <h1 class="text-4xl font-extrabold text-[#073B4C]">おこづかいゲット大作戦！</h1>
   <p class="text-lg text-[#118AB2]">ログインしてスタンプを押そう！</p>
-  
-<form id="login-form" class="flex flex-col space-y-4 w-72">
-  <select id="role-select" class="border p-2 rounded text-center">
-    <option value="child">子どもモード</option>
-    <option value="parent">保護者モード</option>
-  </select>
-  <input type="text" id="user-id-input" placeholder="ユーザーID（保護者用）" class="border p-2 rounded text-center hidden" />
-  <input type="password" id="user-pass-input" placeholder="パスワード（保護者用）" class="border p-2 rounded text-center hidden" />
-  <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
-    ログイン
-  </button>
-</form>
-<p id="login-error" class="text-red-600 text-sm font-bold"></p>
-<script>
-  const roleSelect = document.getElementById('role-select');
-  const userIdInput = document.getElementById('user-id-input');
-  const userPassInput = document.getElementById('user-pass-input');
-  roleSelect.addEventListener('change', () => {
-    const show = roleSelect.value === 'parent';
-    userIdInput.classList.toggle('hidden', !show);
-    userPassInput.classList.toggle('hidden', !show);
-  });
-</script>
-
+  <form id="login-form" class="flex flex-col space-y-4 w-72">
+    <input type="text" id="user-id-input" placeholder="ユーザーID" class="border p-2 rounded text-center" required />
+    <input type="password" id="user-pass-input" placeholder="パスワード" class="border p-2 rounded text-center" required />
+    <select id="role-select" class="border p-2 rounded text-center">
+      <option value="child">子どもモード</option>
+      <option value="parent">保護者モード</option>
+    </select>
+    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+      ログイン
+    </button>
+  </form>
   <p id="login-error" class="text-red-600 text-sm font-bold"></p>
 </div>
  class="bg-gray-100 p-8 flex flex-col items-center">
@@ -493,7 +480,7 @@ const firebaseConfig = {
             <p id="modal-message" class="text-xl font-bold"></p>
         </div>
     </div>
-    <div class="bg-white rounded-xl shadow-lg mx-auto p-6 w-full max-w-4xl">
+    <div class="bg-white rounded-xl shadow-lg p-6 w-full max-w-4xl">
         <div class="text-center mb-8">
             <h1 class="text-3xl font-bold mb-2">おこづかいカレンダー</h1>
             <p class="text-gray-600" id="user-id-display">ユーザーID: ...</p>
@@ -574,31 +561,52 @@ const firebaseConfig = {
     
   }
 
-  loginForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const id = document.getElementById('user-id-input').value.trim();
-    const pw = document.getElementById('user-pass-input').value.trim();
-    const role = document.getElementById('role-select').value;
-    if (!USERS[id]) return errorMsg.textContent = "ユーザーIDが存在しません";
-    if (USERS[id].password !== pw) return errorMsg.textContent = "パスワードが違います";
-    if (USERS[id].role !== role) return errorMsg.textContent = "ロールが一致しません";
+  
+loginForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const role = document.getElementById('role-select').value;
+  errorMsg.textContent = '';  // エラーメッセージ初期化
+
+  if (role === 'child') {
+    const id = 'child1';
     localStorage.setItem('userId', id);
-    localStorage.setItem('userRole', role);
-    
-      loginScreen.style.display = 'none';
-      if (mainApp) mainApp.style.display = 'block';
-      if (userIdDisplay) {
-        userIdDisplay.innerHTML = `ログイン中：<strong>${id}</strong>（${role === 'parent' ? '保護者' : '子ども'}）
-          <button onclick="logout()" class="ml-2 text-sm text-blue-600 underline">ログアウト</button>`;
-      }
-      window.isParent = (role === 'parent');
-      window.userId = id;
-      if (typeof renderCalendar === 'function') renderCalendar();
+    localStorage.setItem('userRole', 'child');
+    loginScreen.style.display = 'none';
+    if (mainApp) mainApp.style.display = 'block';
+    if (userIdDisplay) {
+      userIdDisplay.innerHTML = `ログイン中：<strong>${id}</strong>（子ども）
+        <button onclick="logout()" class="ml-2 text-sm text-blue-600 underline">ログアウト</button>`;
+    }
+    window.isParent = false;
+    window.userId = id;
+    if (typeof renderCalendar === 'function') renderCalendar();
+    return;
+  }
+
+  const id = document.getElementById('user-id-input').value.trim();
+  const pw = document.getElementById('user-pass-input').value.trim();
+  if (id !== 'parent1' || pw !== 'admin') {
+    errorMsg.textContent = 'IDまたはパスワードが違います';
+    return;
+  }
+
+  localStorage.setItem('userId', id);
+  localStorage.setItem('userRole', 'parent');
+  loginScreen.style.display = 'none';
+  if (mainApp) mainApp.style.display = 'block';
+  if (userIdDisplay) {
+    userIdDisplay.innerHTML = `ログイン中：<strong>${id}</strong>（保護者）
+      <button onclick="logout()" class="ml-2 text-sm text-blue-600 underline">ログアウト</button>`;
+  }
+  window.isParent = true;
+  window.userId = id;
+  if (typeof renderCalendar === 'function') renderCalendar();
+});
+
     
   });
 
   window.addEventListener('DOMContentLoaded', () => {
-  if (typeof renderCalendar === 'function') renderCalendar();
   if (typeof renderCalendar === 'function') renderCalendar();
     const uid = localStorage.getItem('userId');
     const role = localStorage.getItem('userRole');
