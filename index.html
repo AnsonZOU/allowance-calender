@@ -548,7 +548,17 @@ const firebaseConfig = {
   function logout() {
     localStorage.removeItem('userId');
     localStorage.removeItem('userRole');
-    setTimeout(() => { if (typeof renderCalendar === 'function') renderCalendar(); }, 500);
+    
+      loginScreen.style.display = 'none';
+      if (mainApp) mainApp.style.display = 'block';
+      if (userIdDisplay) {
+        userIdDisplay.innerHTML = `ログイン中：<strong>${id}</strong>（${role === 'parent' ? '保護者' : '子ども'}）
+          <button onclick="logout()" class="ml-2 text-sm text-blue-600 underline">ログアウト</button>`;
+      }
+      window.isParent = (role === 'parent');
+      window.userId = id;
+      if (typeof renderCalendar === 'function') renderCalendar();
+    
   }
 
   loginForm.addEventListener('submit', (e) => {
@@ -561,7 +571,17 @@ const firebaseConfig = {
     if (USERS[id].role !== role) return errorMsg.textContent = "ロールが一致しません";
     localStorage.setItem('userId', id);
     localStorage.setItem('userRole', role);
-    setTimeout(() => { if (typeof renderCalendar === 'function') renderCalendar(); }, 500);
+    
+      loginScreen.style.display = 'none';
+      if (mainApp) mainApp.style.display = 'block';
+      if (userIdDisplay) {
+        userIdDisplay.innerHTML = `ログイン中：<strong>${id}</strong>（${role === 'parent' ? '保護者' : '子ども'}）
+          <button onclick="logout()" class="ml-2 text-sm text-blue-600 underline">ログアウト</button>`;
+      }
+      window.isParent = (role === 'parent');
+      window.userId = id;
+      if (typeof renderCalendar === 'function') renderCalendar();
+    
   });
 
   window.addEventListener('DOMContentLoaded', () => {
