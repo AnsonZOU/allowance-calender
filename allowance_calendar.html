@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お小遣いカレンダー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #f0f4f8;
+            color: #1f2937;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 4px;
+        }
+        .day-cell {
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            cursor: pointer;
+            min-height: 120px;
+            position: relative;
+        }
+        .day-cell:hover {
+            transform: scale(1.03);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .day-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            font-weight: 600;
+            position: absolute;
+            top: 4px;
+            left: 8px;
+        }
+        .tasks-container {
+            display: flex;
+            gap: 6px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .task-button {
+            width: 32px;
+            height: 32px;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            transition: background-color 0.2s;
+            background-color: #e5e7eb;
+            border: none;
+            cursor: pointer;
+        }
+        .task-button.completed {
+            background-color: #34d399;
+        }
+        .task-button.approved {
+            background-color: #fbbf24;
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+        }
+        .task-button.rejected {
+            background-color: #ef4444;
+        }
+        .task-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            height: 300px;
+            margin: 2rem auto;
+        }
+        .progress-stamp {
+            background-color: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+        }
+        .progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background-color: #FFD700;
+            transition: height 0.5s ease-in-out;
+            z-index: 0;
+        }
+        .progress-text {
+            position: relative;
+            z-index: 1;
+        }
+        .photo-preview {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            margin: 16px 0;
+        }
+        .auth-screen {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .auth-form {
+            max-width: 400px;
+            width: 100%;
+            padding: 2rem;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .mode-selector {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .mode-button {
+            flex: 1;
+            padding: 16px;
+            border-radius: 8px;
+            border: 2px solid #e5e7eb;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .mode-button:hover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        .mode-button.selected {
+            border-color: #3b82f6;
+            background-color: #3b82f6;
+            color: white;
+        }
+        .credentials-form {
+            display: none;
+        }
+        .credentials-form.show {
+            display: block;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- 認証画面 -->
+    <div id="auth-screen" class="auth-screen">
+        <div class="auth-form">
+            <h1 class="text-3xl font-bold text-center mb-6">お小遣いカレンダー</h1>
+            
+            <!-- モード選択 -->
+            <div class="mode-selector">
+                <div id="child-mode" class="mode-button">
+                    <div class="text-2xl mb-2">👶</div>
+                    <div class="font-bold">お子様モード</div>
+                    <div class="text-sm text-gray-600">タップでログイン</div>
+                </div>
+                <div id="parent-mode" class="mode-button">
+                    <div class="text-2xl mb-2">👨‍👩‍👧‍👦</div>
+                    <div class="font-bold">親モード</div>
+                    <div class="text-sm text-gray-600">承認・管理機能</div>
+                </div>
+            </div>
+
+            <!-- 認証情報入力フォーム -->
+            <div id="credentials-form" class="credentials-form">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">ユーザーID</label>
+                        <input type="text" id="username" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="liu または admin">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">パスワード</label>
+                        <input type="password" id="password" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500" placeholder="admin">
+                    </div>
+                </div>
+                <button id="parent-login-button" class="w-full bg-blue-500 text-white py-3 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium mt-6" style="display: none;">親モードでログイン</button>
+            </div>
+            
+            <div id="login-error" class="text-red-500 text-center mt-4 hidden"></div>
+        </div>
+    </div>
+
+    <!-- メインアプリ画面 -->
+    <div id="main-app" class="hidden">
+        <!-- モーダル各種 -->
+        <div id="modal" class="modal">
+            <div class="modal-content rounded-lg shadow-lg">
+                <p id="modal-message" class="text-xl font-bold mb-4"></p>
+                <button onclick="closeModal('modal')" class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600">OK</button>
+            </div>
+        </div>
+
+        <div id="upload-modal" class="modal">
+            <div class="modal-content">
+                <h3 id="upload-title" class="text-xl font-bold mb-4"></h3>
+                <p id="upload-message" class="mb-4"></p>
+                <input type="file" id="photo-input" accept="image/*" class="mb-4 w-full p-2 border border-gray-300 rounded">
+                <div class="flex gap-4 justify-center">
+                    <button onclick="uploadPhoto()" class="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600">アップロード</button>
+                    <button onclick="closeModal('upload-modal')" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">キャンセル</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="approval-modal" class="modal">
+            <div class="modal-content">
+                <h3 class="text-xl font-bold mb-4">写真確認</h3>
+                <img id="approval-photo" class="photo-preview" alt="アップロードされた写真">
+                <p id="approval-info" class="mb-4 text-gray-600"></p>
+                <div class="flex gap-4 justify-center">
+                    <button onclick="approveTask()" class="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600">承認</button>
+                    <button onclick="rejectTask()" class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600">却下</button>
+                    <button onclick="closeModal('approval-modal')" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">閉じる</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="container mx-auto p-4 md:p-8 max-w-5xl">
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <div class="text-center mb-4">
+                    <h1 class="text-3xl font-bold mb-2">お小遣いカレンダー</h1>
+                    <p class="text-gray-600" id="user-id-display">ユーザー: ...</p>
+                </div>
+                <div class="text-center">
+                    <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">ログアウト</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div id="stamp-daily-task" class="progress-stamp p-4 flex flex-col items-center justify-center">
+                    <div class="progress-bar" id="progress-bar-daily-task"></div>
+                    <h3 class="font-bold text-xl mb-2 progress-text">📝</h3>
+                    <p id="progress-text-daily-task" class="progress-text">Daily Task</p>
+                </div>
+                <div id="stamp-daily-challenge" class="progress-stamp p-4 flex flex-col items-center justify-center">
+                    <div class="progress-bar" id="progress-bar-daily-challenge"></div>
+                    <h3 class="font-bold text-xl mb-2 progress-text">📖</h3>
+                    <p id="progress-text-daily-challenge" class="progress-text">Daily Challenge</p>
+                </div>
+                <div id="stamp-bonus" class="progress-stamp p-4 flex flex-col items-center justify-center">
+                    <div class="progress-bar" id="progress-bar-bonus"></div>
+                    <h3 class="font-bold text-xl mb-2 progress-text">💪</h3>
+                    <p id="progress-text-bonus" class="progress-text">Bonus Get!</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <div class="flex justify-between items-center mb-6">
+                    <button onclick="changeMonth(-1)" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-full hover:bg-gray-300 transition-colors">←</button>
+                    <h2 id="month-year" class="text-2xl font-bold text-center"></h2>
+                    <button onclick="changeMonth(1)" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-full hover:bg-gray-300 transition-colors">→</button>
+                </div>
+                <div class="grid grid-cols-7 text-center font-bold text-gray-500 mb-2">
+                    <div>日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div>
+                </div>
+                <div id="calendar-grid" class="calendar-grid"></div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8 text-center">
+                <h3 class="text-2xl font-bold text-green-700 mb-4">今月の合計金額</h3>
+                <p id="total-earnings" class="text-4xl font-bold text-green-600">1000円</p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <h3 class="text-2xl font-bold text-center mb-4">今月のお小遣い進捗</h3>
+                <div class="chart-container">
+                    <canvas id="monthlyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 rounded-lg border border-gray-200 p-4">
+                <h3 class="font-bold text-gray-700 mb-2">使い方:</h3>
+                <ul class="text-gray-600 list-disc list-inside">
+                    <li><span class="font-bold text-yellow-500">📝</span> を押すと、Daily Task完了スタンプが押されます。</li>
+                    <li><span class="font-bold text-blue-500">📖</span> を押すと、Daily Challenge完了スタンプが押されます。</li>
+                    <li><span class="font-bold text-red-500">💪</span> を押すと、Bonus Get!完了スタンプが押されます。</li>
+                    <li>スタンプを押すと、背景色が変わり完了したことがわかります。</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase スクリプト -->
+    <script>
+        // Firebase設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyB2t542oGMu1gTA_dkJaVTKhIm5JmeRvvs",
+            authDomain: "allowance-calender.firebaseapp.com",
+            projectId: "allowance-calender",
+            storageBucket: "allowance-calender.firebasestorage.app",
+            messagingSenderId: "49360595314",
+            appId: "1:49360595314:web:ce1e89134df7539f2755eb"
+        };
+
+        // Firebase初期化
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // グローバル変数
+        let userId, isParent = false;
+        let currentMonth = new Date();
+        let monthlyChart;
+        let currentTaskForUpload = null;
+        let unsubscribe;
+
+        // 定数
+        const FIXED_ALLOWANCE = 1000;
+        const DAILY_TASK_AWARD = 100;
+        const DAILY_CHALLENGE_AWARD = 200;
+        const BONUS_TIER1_COUNT = 10;
+        const BONUS_TIER1_AMOUNT = 2000;
+        const BONUS_TIER2_COUNT = 20;
+        const BONUS_TIER2_AMOUNT = 4000;
+
+        // メッセージ表示
+        function SHOW_MESSAGE(message, duration = 3000) {
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('modal').style.display = 'flex';
+            setTimeout(() => {
+                document.getElementById('modal').style.display = 'none';
+            }, duration);
+        }
+
+        // 子供モードでログイン
+        function loginAsChild() {
+            console.log('子供モードでログイン中...');
+            isParent = false;
+            auth.signInAnonymously()
+                .then(() => {
+                    console.log('子供モードログイン成功');
+                })
+                .catch((error) => {
+                    console.error("子供モードログインエラー:", error);
+                    SHOW_MESSAGE("ログインに失敗しました");
+                });
+        }
+
+        // 親モード選択
+        function selectParentMode() {
+            console.log('親モードを選択');
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('selected'));
+            document.getElementById('parent-mode').classList.add('selected');
+            document.getElementById('credentials-form').classList.add('show');
+        }
+
+        // 親認証情報検証
+        function validateParentCredentials() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (username && password) {
+                document.getElementById('parent-login-button').style.display = 'block';
+            } else {
+                document.getElementById('parent-login-button').style.display = 'none';
+            }
+        }
+
+        // 親モードでログイン
+        function loginAsParent() {
+            console.log('親モードでログイン中...');
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if ((username === 'liu' && password === 'admin') || (username === 'admin' && password === 'admin')) {
+                isParent = true;
+                auth.signInAnonymously()
+                    .then(() => {
+                        console.log('親モードログイン成功');
+                    })
+                    .catch((error) => {
+                        console.error("親モードログインエラー:", error);
+                        SHOW_MESSAGE("ログインに失敗しました");
+                    });
+            } else {
+                SHOW_MESSAGE('親モードのIDまたはパスワードが正しくありません');
+            }
+        }
+
+        // ログアウト
+        function logout() {
+            if (unsubscribe) unsubscribe();
+            auth.signOut();
+            document.getElementById('main-app').classList.add('hidden');
+            document.getElementById('auth-screen').style.display = 'flex';
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('credentials-form').classList.remove('show');
+            document.querySelectorAll('.mode-button').forEach(btn => btn.classList.remove('selected'));
+        }
+
+        // 認証状態の監視
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                userId = user.uid;
+                console.log('認証成功、メインアプリを表示:', userId);
+                showMainApp();
+            }
+        });
+
+        // メインアプリ表示
+        function showMainApp() {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('main-app').classList.remove('hidden');
+            document.getElementById('user-id-display').textContent = `ユーザー: ${userId.substring(0, 8)}... (${isParent ? '親' : '子供'})`;
+            
+            setupCalendar();
+            listenForUpdates();
+        }
+
+        // データ更新の監視
+        function listenForUpdates() {
+            if (unsubscribe) unsubscribe();
+            const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}`;
+            const docRef = db.collection('allowanceData').doc(`${userId}_${monthKey}`);
+            
+            unsubscribe = docRef.onSnapshot((doc) => {
+                if (doc.exists) {
+                    updateUI(doc.data());
+                } else {
+                    updateUI({});
+                }
+            });
+        }
+
+        // カレンダーセットアップ
+        function setupCalendar() {
+            const calendarGrid = document.getElementById('calendar-grid');
+            const monthYearDisplay = document.getElementById('month-year');
+            
+            calendarGrid.innerHTML = '';
+            monthYearDisplay.textContent = `${currentMonth.getFullYear()}年 ${currentMonth.getMonth() + 1}月`;
+            
+            const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay();
+            const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+            const today = new Date();
+
+            // 空セル
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.classList.add('day-cell', 'bg-gray-200', 'cursor-default');
+                calendarGrid.appendChild(emptyCell);
+            }
+
+            // 日付セル
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dayCell = document.createElement('div');
+                dayCell.classList.add('day-cell');
+                dayCell.dataset.day = i;
+                const dayDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), i);
+                const isToday = dayDate.getDate() === today.getDate() && 
+                               dayDate.getMonth() === today.getMonth() && 
+                               dayDate.getFullYear() === today.getFullYear();
+                
+                const dayLabel = document.createElement('div');
+                dayLabel.classList.add('day-label');
+                dayLabel.textContent = i;
+                dayCell.appendChild(dayLabel);
+                
+                const tasksContainer = document.createElement('div');
+                tasksContainer.classList.add('tasks-container');
+
+                const tasks = ['dailyTask', 'dailyChallenge', 'bonus'];
+                const taskEmojis = {
+                    dailyTask: '📝',
+                    dailyChallenge: '📖',
+                    bonus: '💪'
+                };
+
+                tasks.forEach(task => {
+                    const taskButton = document.createElement('button');
+                    taskButton.classList.add('task-button');
+                    taskButton.dataset.task = task;
+                    taskButton.textContent = taskEmojis[task];
+                    
+                    if (isParent) {
+                        taskButton.disabled = false;
+                    } else {
+                        taskButton.disabled = !isToday;
+                    }
+
+                    if (!taskButton.disabled) {
+                        taskButton.addEventListener('click', () => handleTaskCompletion(i, task));
+                    } else {
+                        taskButton.classList.add('opacity-50', 'cursor-not-allowed');
+                    }
+                    tasksContainer.appendChild(taskButton);
+                });
+                dayCell.appendChild(tasksContainer);
+                calendarGrid.appendChild(dayCell);
+            }
+        }
+
+        // タスク完了処理
+        function handleTaskCompletion(day, task) {
+            currentTaskForUpload = { day, task };
+            
+            if (isParent) {
+                showApprovalModal(day, task);
+            } else {
+                if (task === 'bonus') {
+                    setTaskData(day, task, 'completed');
+                    SHOW_MESSAGE('Bonus Get! 完了しました！');
+                } else {
+                    showUploadModal(task);
+                }
+            }
+        }
+
+        // アップロードモーダル表示
+        function showUploadModal(task) {
+            const uploadModal = document.getElementById('upload-modal');
+            const uploadTitle = document.getElementById('upload-title');
+            const uploadMessage = document.getElementById('upload-message');
+            
+            if (task === 'dailyTask') {
+                uploadTitle.textContent = 'Daily Task 写真アップロード';
+                uploadMessage.textContent = '本日の90分をアップしてね';
+            } else if (task === 'dailyChallenge') {
+                uploadTitle.textContent = 'Daily Challenge 写真アップロード';
+                uploadMessage.textContent = '今日も頑張った！';
+            }
+            
+            document.getElementById('photo-input').value = '';
+            uploadModal.style.display = 'flex';
+        }
+
+        // 承認モーダル表示
+        function showApprovalModal(day, task) {
+            const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}`;
+            const docRef = db.collection('allowanceData').doc(`${userId}_${monthKey}`);
+            
+            docRef.get().then((doc) => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data[day]) {
+                        data[day][task + 'Status'] = status;
+                        return docRef.set(data);
+                    }
+                }
+            }).catch((error) => {
+                console.error("ステータス更新エラー:", error);
+                SHOW_MESSAGE('ステータスの更新に失敗しました。');
+            });
+        }
+
+        // UI更新
+        function updateUI(data) {
+            const dayCells = document.querySelectorAll('.day-cell');
+            dayCells.forEach(cell => {
+                const day = cell.dataset.day;
+                const dailyData = data[day];
+                const dailyTaskButton = cell.querySelector('[data-task="dailyTask"]');
+                const dailyChallengeButton = cell.querySelector('[data-task="dailyChallenge"]');
+                const bonusButton = cell.querySelector('[data-task="bonus"]');
+
+                if (dailyTaskButton && dailyChallengeButton && bonusButton) {
+                    // Daily Task
+                    dailyTaskButton.classList.remove('completed', 'approved', 'rejected');
+                    if (dailyData && dailyData.dailyTask) {
+                        if (dailyData.dailyTaskStatus === 'approved') {
+                            dailyTaskButton.classList.add('approved');
+                        } else if (dailyData.dailyTaskStatus === 'rejected') {
+                            dailyTaskButton.classList.add('rejected');
+                        } else {
+                            dailyTaskButton.classList.add('completed');
+                        }
+                    }
+
+                    // Daily Challenge
+                    dailyChallengeButton.classList.remove('completed', 'approved', 'rejected');
+                    if (dailyData && dailyData.dailyChallenge) {
+                        if (dailyData.dailyChallengeStatus === 'approved') {
+                            dailyChallengeButton.classList.add('approved');
+                        } else if (dailyData.dailyChallengeStatus === 'rejected') {
+                            dailyChallengeButton.classList.add('rejected');
+                        } else {
+                            dailyChallengeButton.classList.add('completed');
+                        }
+                    }
+                    
+                    // Bonus
+                    bonusButton.classList.remove('completed', 'approved', 'rejected');
+                    if (dailyData && dailyData.bonus) {
+                        if (dailyData.bonusStatus === 'approved') {
+                            bonusButton.classList.add('approved');
+                        } else if (dailyData.bonusStatus === 'rejected') {
+                            bonusButton.classList.add('rejected');
+                        } else {
+                            bonusButton.classList.add('completed');
+                        }
+                    }
+                }
+            });
+
+            updateProgressBars(data);
+            updateEarnings(data);
+            renderMonthlyChart(data);
+        }
+
+        // プログレスバー更新
+        function updateProgressBars(data) {
+            const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
+            const dailyTaskCount = Object.values(data).filter(d => d.dailyTask && d.dailyTaskStatus === 'approved').length;
+            const dailyChallengeCount = Object.values(data).filter(d => d.dailyChallenge && d.dailyChallengeStatus === 'approved').length;
+            const bonusCount = Object.values(data).filter(d => d.bonus && (d.bonusStatus === 'approved' || d.bonusStatus === 'pending')).length;
+
+            document.getElementById('progress-bar-daily-task').style.height = `${(dailyTaskCount / daysInMonth) * 100}%`;
+            document.getElementById('progress-text-daily-task').textContent = `Daily Task (${dailyTaskCount} / ${daysInMonth} 日)`;
+            document.getElementById('progress-bar-daily-challenge').style.height = `${(dailyChallengeCount / daysInMonth) * 100}%`;
+            document.getElementById('progress-text-daily-challenge').textContent = `Daily Challenge (${dailyChallengeCount} / ${daysInMonth} 日)`;
+            document.getElementById('progress-bar-bonus').style.height = `${(bonusCount / daysInMonth) * 100}%`;
+            document.getElementById('progress-text-bonus').textContent = `Bonus Get! (${bonusCount} / ${daysInMonth} 日)`;
+
+            if (dailyTaskCount === daysInMonth) document.getElementById('stamp-daily-task').style.backgroundColor = '#FFD700';
+            else document.getElementById('stamp-daily-task').style.backgroundColor = '#fff';
+
+            if (dailyChallengeCount === daysInMonth) document.getElementById('stamp-daily-challenge').style.backgroundColor = '#FFD700';
+            else document.getElementById('stamp-daily-challenge').style.backgroundColor = '#fff';
+
+            if (bonusCount === daysInMonth) document.getElementById('stamp-bonus').style.backgroundColor = '#FFD700';
+            else document.getElementById('stamp-bonus').style.backgroundColor = '#fff';
+        }
+
+        // 収益更新
+        function updateEarnings(data) {
+            const dailyTaskCount = Object.values(data).filter(d => d.dailyTask && d.dailyTaskStatus === 'approved').length;
+            const dailyChallengeCount = Object.values(data).filter(d => d.dailyChallenge && d.dailyChallengeStatus === 'approved').length;
+            const bonusCount = Object.values(data).filter(d => d.bonus && (d.bonusStatus === 'approved' || d.bonusStatus === 'pending')).length;
+
+            let totalDailyTaskEarnings = dailyTaskCount * DAILY_TASK_AWARD;
+            let totalDailyChallengeEarnings = dailyChallengeCount * DAILY_CHALLENGE_AWARD;
+            let bonusAmount = 0;
+            if (bonusCount >= BONUS_TIER2_COUNT) {
+                bonusAmount = BONUS_TIER2_AMOUNT;
+            } else if (bonusCount >= BONUS_TIER1_COUNT) {
+                bonusAmount = BONUS_TIER1_AMOUNT;
+            }
+            const totalMonthlyEarnings = FIXED_ALLOWANCE + totalDailyTaskEarnings + totalDailyChallengeEarnings + bonusAmount;
+            document.getElementById('total-earnings').textContent = `${totalMonthlyEarnings.toLocaleString()}円`;
+        }
+
+        // チャート描画
+        function renderMonthlyChart(data) {
+            const dailyTaskCount = Object.values(data).filter(d => d.dailyTask && d.dailyTaskStatus === 'approved').length;
+            const dailyChallengeCount = Object.values(data).filter(d => d.dailyChallenge && d.dailyChallengeStatus === 'approved').length;
+            const bonusCount = Object.values(data).filter(d => d.bonus && (d.bonusStatus === 'approved' || d.bonusStatus === 'pending')).length;
+
+            const totalDailyTaskEarnings = dailyTaskCount * DAILY_TASK_AWARD;
+            const totalDailyChallengeEarnings = dailyChallengeCount * DAILY_CHALLENGE_AWARD;
+            let bonusAmount = 0;
+            if (bonusCount >= BONUS_TIER2_COUNT) {
+                bonusAmount = BONUS_TIER2_AMOUNT;
+            } else if (bonusCount >= BONUS_TIER1_COUNT) {
+                bonusAmount = BONUS_TIER1_AMOUNT;
+            }
+
+            const ctx = document.getElementById('monthlyChart').getContext('2d');
+            if (monthlyChart) {
+                monthlyChart.destroy();
+            }
+
+            monthlyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['固定費', 'Daily Task', 'Daily Challenge', 'ボーナス'],
+                    datasets: [{
+                        label: '獲得金額（円）',
+                        data: [FIXED_ALLOWANCE, totalDailyTaskEarnings, totalDailyChallengeEarnings, bonusAmount],
+                        backgroundColor: ['#63B3ED', '#FFD166', '#06D6A0', '#FF6B6B'],
+                        borderColor: ['#63B3ED', '#FFD166', '#06D6A0', '#FF6B6B'],
+                        borderWidth: 1,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // ユーティリティ関数
+        function getTaskLabel(task) {
+            const labels = {
+                dailyTask: 'Daily Task',
+                dailyChallenge: 'Daily Challenge',
+                bonus: 'Bonus Get!'
+            };
+            return labels[task];
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function changeMonth(direction) {
+            currentMonth.setMonth(currentMonth.getMonth() + direction);
+            setupCalendar();
+            listenForUpdates();
+        }
+
+        // DOMContentLoadedイベント
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM読み込み完了、イベントリスナーを設定中...');
+            
+            // 子供モードボタン
+            const childModeBtn = document.getElementById('child-mode');
+            if (childModeBtn) {
+                childModeBtn.addEventListener('click', loginAsChild);
+                console.log('子供モードボタンのイベントリスナー設定完了');
+            }
+            
+            // 親モードボタン
+            const parentModeBtn = document.getElementById('parent-mode');
+            if (parentModeBtn) {
+                parentModeBtn.addEventListener('click', selectParentMode);
+                console.log('親モードボタンのイベントリスナー設定完了');
+            }
+            
+            // 親ログインボタン
+            const parentLoginBtn = document.getElementById('parent-login-button');
+            if (parentLoginBtn) {
+                parentLoginBtn.addEventListener('click', loginAsParent);
+                console.log('親ログインボタンのイベントリスナー設定完了');
+            }
+            
+            // 入力フィールド
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            
+            if (usernameInput) {
+                usernameInput.addEventListener('input', validateParentCredentials);
+                usernameInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        loginAsParent();
+                    }
+                });
+            }
+            
+            if (passwordInput) {
+                passwordInput.addEventListener('input', validateParentCredentials);
+                passwordInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        loginAsParent();
+                    }
+                });
+            }
+
+            // モーダル外クリックで閉じる
+            document.querySelectorAll('.modal').forEach(modal => {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === modal) {
+                        modal.style.display = 'none';
+                    }
+                });
+            });
+
+            console.log('お小遣いカレンダーアプリが初期化されました');
+        });
+    </script>
+</body>
+</html>
+                    const data = doc.data();
+                    const dayData = data[day];
+                    
+                    if (dayData && dayData[task + 'Photo']) {
+                        const approvalModal = document.getElementById('approval-modal');
+                        const approvalPhoto = document.getElementById('approval-photo');
+                        const approvalInfo = document.getElementById('approval-info');
+                        
+                        approvalPhoto.src = dayData[task + 'Photo'];
+                        approvalInfo.textContent = `${day}日 - ${getTaskLabel(task)}`;
+                        
+                        approvalModal.style.display = 'flex';
+                    } else {
+                        SHOW_MESSAGE('この日の写真はまだアップロードされていません。');
+                    }
+                } else {
+                    SHOW_MESSAGE('この日の写真はまだアップロードされていません。');
+                }
+            }).catch((error) => {
+                console.error("写真取得エラー:", error);
+                SHOW_MESSAGE('写真の取得に失敗しました。');
+            });
+        }
+
+        // 写真アップロード
+        function uploadPhoto() {
+            const fileInput = document.getElementById('photo-input');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                SHOW_MESSAGE('写真を選択してください。');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const { day, task } = currentTaskForUpload;
+                setTaskData(day, task, 'completed', e.target.result);
+                closeModal('upload-modal');
+                SHOW_MESSAGE('写真がアップロードされました！');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // タスク承認
+        function approveTask() {
+            const { day, task } = currentTaskForUpload;
+            setTaskStatus(day, task, 'approved');
+            closeModal('approval-modal');
+            SHOW_MESSAGE('承認しました！');
+        }
+
+        // タスク却下
+        function rejectTask() {
+            const { day, task } = currentTaskForUpload;
+            setTaskStatus(day, task, 'rejected');
+            closeModal('approval-modal');
+            SHOW_MESSAGE('却下しました。');
+        }
+
+        // タスクデータ設定
+        function setTaskData(day, task, status, photo = null) {
+            const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}`;
+            const docRef = db.collection('allowanceData').doc(`${userId}_${monthKey}`);
+            
+            docRef.get().then((doc) => {
+                let data = {};
+                if (doc.exists) {
+                    data = doc.data();
+                }
+                
+                if (!data[day]) {
+                    data[day] = {};
+                }
+                
+                data[day][task] = status;
+                data[day][task + 'Status'] = status === 'completed' ? 'pending' : status;
+                if (photo) {
+                    data[day][task + 'Photo'] = photo;
+                }
+                
+                return docRef.set(data);
+            }).catch((error) => {
+                console.error("データ保存エラー:", error);
+                SHOW_MESSAGE('データの保存に失敗しました。');
+            });
+        }
+
+        // タスクステータス設定
+        function setTaskStatus(day, task, status) {
+            const monthKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth() + 1}`;
+            const docRef = db.collection('allowanceData').doc(`${userId}_${monthKey}`);
+            
+            docRef.get().then((doc) => {
+                if (doc.exists) {
